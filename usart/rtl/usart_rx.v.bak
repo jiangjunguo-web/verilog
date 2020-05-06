@@ -1,0 +1,97 @@
+//****************************************************
+//                  usart 接收模块
+//****************************************************
+module usart_rx(
+	input sys_clk,
+	input sys_rst_n,
+	
+	input data_in,
+	output reg data_en,
+	output reg [7:0] data_out
+);
+
+//parameter define 
+parameter BOUNDS  = 115200;
+parameter S_CLK   = 50_000_000;
+localparam B_CNT  = S_CLK / BOUNDS;
+
+//reg define 
+reg [15:0] cnt;
+reg rx_valid;
+reg [ 4:0] data_cnt;
+reg [ 7:0] data_reg;
+
+//****************************************************
+//                   main code 
+//****************************************************
+//确定接收时间段
+always @(posedge sys_clk or negedge sys_rst_n) begin
+	if(!sys_rst_n) 
+	    rx_valid <= 1'b0;
+   else if(data_in == 1'b0 && data_cnt == 4'd0) 
+	    rx_valid <= 1'b1;
+	else if(data_cnt == 4'd9)
+	    rx_valid <= 1'b0;
+	else 
+	    rx_valid <= rx_valid;
+end 
+
+//接收时间计数
+always @(posedge sys_clk or negedge sys_rst_n) begin
+	if(!sys_rst_n) 
+	    cnt <= 16'd0;
+   else if(cnt < B_CNT - 1) 
+	    cnt <= cnt + 1'b1;
+	else 
+	    cnt <= 16'd0;
+end 
+
+//接收位数计数
+always @(posedge sys_clk or negedge sys_rst_n) begin
+	if(!sys_rst_n)
+	    data_cnt <= 4'd0;
+	else if(rx_valid && cnt == B_CNT - 1) 
+	    if(data_cnt <= 4'd8)
+	        data_cnt <= data_cnt + 1'b1;
+		 else 
+		     data_cnt <= 4'd0;
+	else 
+	    data_cnt <= data_cnt;
+end 
+
+//数据接收
+always @(posedge sys_clk or negedge sys_rst_n) begin
+	if(!sys_rst_n) begin
+	    data_reg <= 8'd0;
+	end 
+	else if(rx_valid && cnt == (B_CNT >> 1)) begin
+	    case(data_cnt)
+			  4'd1 : data_reg[0] <= data_in;
+			  4'd2 : data_reg[1] <= data_in;  
+			  4'd3 : data_reg[2] <= data_in;  
+			  4'd4 : data_reg[3] <= data_in;  
+			  4'd5 : data_reg[4] <= data_in;  
+			  4'd6 : data_reg[5] <= data_in;  
+			  4'd7 : data_reg[6] <= data_in;  
+			  4'd8 : data_reg[7] <= data_in; 
+			  default : ; 
+		 endcase 
+	end 
+end 
+
+//数据发送
+always @(posedge sys_clk or negedge sys_rst_n) begin
+    if(!sys_rst_n) begin 
+	     data_out <= 8'd0;
+		  data_en  <= 1'd0;
+	 end 
+	 else if(data_cnt == 4'd9 && cnt == (B_CNT >> 1)) begin
+	     data_out <= data_reg;
+		  data_en  <= 1'b1; 
+	 end 
+	 else begin
+	     data_out <= data_out;
+		  data_en <= 1'b0;
+    end 	
+end 
+endmodule 
